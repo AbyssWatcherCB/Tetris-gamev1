@@ -1,3 +1,7 @@
+provider "aws" {
+  region = "us-east-1" # Set to your preferred region
+}
+
 resource "aws_iam_role" "example_role" {
   name = "Jenkins-terraform"
   assume_role_policy = <<EOF
@@ -28,12 +32,11 @@ resource "aws_iam_instance_profile" "example_profile" {
 
 resource "aws_security_group" "Jenkins-sg" {
   name        = "Jenkins-Security Group"
-  description = "Open 22,443,80,8080,9000"
+  description = "Open 22,443,80,8080,9000,3000"
 
-  # Define a single ingress rule to allow traffic on all specified ports
   ingress = [
     for port in [22, 80, 443, 8080, 9000, 3000] : {
-      description      = "TLS from VPC"
+      description      = "Allow TCP traffic"
       from_port        = port
       to_port          = port
       protocol         = "tcp"
@@ -57,10 +60,28 @@ resource "aws_security_group" "Jenkins-sg" {
   }
 }
 
+resource "aws_vpc" "example_vpc" {
+  cidr_block = "10.0.0.0/16"
+
+  tags = {
+    Name = "example-vpc"
+  }
+}
+
+resource "aws_subnet" "example_subnet" {
+  vpc_id     = aws_vpc.example_vpc.id
+  cidr_block = "10.0.1.0/24"
+
+  tags = {
+    Name = "example-subnet"
+  }
+}
+
 resource "aws_instance" "web" {
-  ami                    = "ami-03f4878755434977f"
+  ami                    = "ami-0c55b159cbfafe1f0" # Example AMI ID for us-east-1
   instance_type          = "t2.large"
   key_name               = "Argo key"
+  subnet_id              = aws_subnet.example_subnet.id
   vpc_security_group_ids = [aws_security_group.Jenkins-sg.id]
   user_data              = templatefile("./install_jenkins.sh", {})
   iam_instance_profile   = aws_iam_instance_profile.example_profile.name
